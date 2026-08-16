@@ -26,8 +26,7 @@ const games=[
     url:'jeux/space-defender/',
     desc:'Protège ta base'
   }
-];
-let current='all';
+];let current='all';
 function filter(x){current=x;render()}
 function render(){let q=document.getElementById('search').value.toLowerCase();let list=games.filter(g=>(current==='all'||g.cat===current)&&g.name.toLowerCase().includes(q));document.getElementById('games').innerHTML=list.map(g=>`<article class="card"><div class="thumb">${g.emoji}</div><div><h3>${g.name}</h3><span class="tag">${g.cat} • ${g.desc}</span><br><a class="play" href="${g.url}">JOUER ▶</a></div></article>`).join('')||'<p>Aucun jeu trouvé.</p>'}
 render();
