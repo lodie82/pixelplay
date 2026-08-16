@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coin Rush 🎮</title>
+
+<style>
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        margin: 0;
+        background: #111827;
+        color: white;
+        font-family: Arial, sans-serif;
+        overflow: hidden;
+        text-align: center;
+    }
+
+    h1 {
+        margin: 15px 0 5px;
+        font-size: 32px;
+    }
+
+    #info {
+        font-size: 20px;
+        margin-bottom: 10px;
+    }
+
+    canvas {
+        background: #1f2937;
+        border: 4px solid #374151;
+        border-radius: 15px;
+        box-shadow: 0 0 30px rgba(0,0,0,.5);
+        max-width: 95vw;
+        max-height: 75vh;
+    }
+
+    #start {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        z-index: 5;
+    }
+
+    button {
+        border: none;
+        padding: 15px 35px;
+        border-radius: 12px;
+        background: #22c55e;
+        color: white;
+        font-size: 22px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+
+    button:hover {
+        background: #16a34a;
+        transform: scale(1.05);
+    }
+
+    #gameOver {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,.85);
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        z-index: 10;
+    }
+
+    #gameOver h2 {
+        font-size: 50px;
+        margin: 10px;
+    }
+</style>
+</head>
+
+<body>
+
+<div id="start">
+    <h1>🪙 COIN RUSH</h1>
+    <p>Déplace-toi avec ZQSD ou les flèches</p>
+    <p>🪙 Attrape les pièces et évite les 👾 !</p>
+    <button onclick="startGame()">JOUER 🎮</button>
+</div>
+
+<div id="gameOver">
+    <h2>💀 GAME OVER</h2>
+    <p id="finalScore"></p>
+    <button onclick="restartGame()">REJOUER 🔄</button>
+</div>
+
+<h1>🪙 Coin Rush</h1>
+<div id="info">
+    Score : <span id="score">0</span>
+    &nbsp; | &nbsp;
+    Niveau : <span id="level">1</span>
+</div>
+
+<canvas id="game" width="800" height="500"></canvas>
+
+<script>
+
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+let keys = {};
+let playing = false;
+
+let score = 0;
+let level = 1;
+
+const player = {
+    x: 380,
+    y: 230,
+    size: 30,
+    speed: 5
+};
+
+let coin = {};
+let enemies = [];
+
+document.addEventListener("keydown", e => {
+    keys[e.key.toLowerCase()] = true;
+});
+
+document.addEventListener("keyup", e => {
+    keys[e.key.toLowerCase()] = false;
+});
+
+function randomPosition(size = 20) {
+    return {
+        x: Math.random() * (canvas.width - size),
+        y: Math.random() * (canvas.height - size)
+    };
+}
+
+function createCoin() {
+    coin = randomPosition(22);
+}
+
+function createEnemy() {
+
+    const pos = randomPosition(28);
+
+    enemies.push({
+        x: pos.x,
+        y: pos.y,
+        size: 28,
+        speed: 1.5 + level * 0.25
+    });
+}
+
+function startGame() {
+
+    document.getElementById("start").style.display = "none";
+
+    score = 0;
+    level = 1;
+
+    player.x = 380;
+    player.y = 230;
+
+    enemies = [];
+
+    createCoin();
+
+    for(let i = 0; i < 2; i++) {
+        createEnemy();
+    }
+
+    playing = true;
+
+    gameLoop();
+}
+
+function restartGame() {
+
+    document.getElementById("gameOver").style.display = "none";
+
+    startGame();
+}
+
+function update() {
+
+    if(!playing) return;
+
+    // Déplacement
+    if(keys["arrowup"] || keys["z"] || keys["w"])
+        player.y -= player.speed;
+
+    if(keys["arrowdown"] || keys["s"])
+        player.y += player.speed;
+
+    if(keys["arrowleft"] || keys["q"] || keys["a"])
+        player.x -= player.speed;
+
+    if(keys["arrowright"] || keys["d"])
+        player.x += player.speed;
+
+    // Limites
+    player.x = Math.max(0, Math.min(canvas.width - player.size, player.x));
+    player.y = Math.max(0, Math.min(canvas.height - player.size, player.y));
+
+    // Collision pièce
+    if(
+        player.x < coin.x + 22 &&
+        player.x + player.size > coin.x &&
+        player.y < coin.y + 22 &&
+        player.y + player.size > coin.y
+    ) {
+
+        score++;
+
+        createCoin();
+
+        // Tous les 5 points = nouveau niveau
+        if(score % 5 === 0) {
+
+            level++;
+
+            createEnemy();
+        }
+    }
+
+    // Ennemis
+    enemies.forEach(enemy => {
+
+        let dx = player.x - enemy.x;
+        let dy = player.y - enemy.y;
+
+        let distance = Math.sqrt(dx * dx + dy * dy);
+
+        if(distance > 0) {
+
+            enemy.x += (dx / distance) * enemy.speed;
+            enemy.y += (dy / distance) * enemy.speed;
+        }
+
+        // Collision joueur / ennemi
+        if(
+            player.x < enemy.x + enemy.size &&
+            player.x + player.size > enemy.x &&
+            player.y < enemy.y + enemy.size &&
+            player.y + player.size > enemy.y
+        ) {
+
+            gameOver();
+        }
+    });
+
+    document.getElementById("score").textContent = score;
+    document.getElementById("level").textContent = level;
+}
+
+function draw() {
+
+    // Fond
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = "#1f2937";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Grille
+    ctx.strokeStyle = "#293548";
+
+    for(let x = 0; x < canvas.width; x += 40) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+    }
+
+    for(let y = 0; y < canvas.height; y += 40) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+    }
+
+    // Pièce
+    ctx.fillStyle = "#facc15";
+    ctx.beginPath();
+    ctx.arc(
+        coin.x + 11,
+        coin.y + 11,
+        11,
+        0,
+        Math.PI * 2
+    );
+    ctx.fill();
+
+    ctx.fillStyle = "#92400e";
+    ctx.font = "bold 15px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(
+        "$",
+        coin.x + 11,
+        coin.y + 16
+    );
+
+    // Joueur
+    ctx.fillStyle = "#3b82f6";
+    ctx.fillRect(
+        player.x,
+        player.y,
+        player.size,
+        player.size
+    );
+
+    // Yeux
+    ctx.fillStyle = "white";
+    ctx.fillRect(player.x + 6, player.y + 7, 6, 6);
+    ctx.fillRect(player.x + 18, player.y + 7, 6, 6);
+
+    ctx.fillStyle = "black";
+    ctx.fillRect(player.x + 8, player.y + 9, 3, 3);
+    ctx.fillRect(player.x + 20, player.y + 9, 3, 3);
+
+    // Ennemis
+    enemies.forEach(enemy => {
+
+        ctx.fillStyle = "#ef4444";
+
+        ctx.fillRect(
+            enemy.x,
+            enemy.y,
+            enemy.size,
+            enemy.size
+        );
+
+        ctx.fillStyle = "white";
+
+        ctx.fillRect(
+            enemy.x + 5,
+            enemy.y + 6,
+            7,
+            7
+        );
+
+        ctx.fillRect(
+            enemy.x + 16,
+            enemy.y + 6,
+            7,
+            7
+        );
+
+        ctx.fillStyle = "black";
+
+        ctx.fillRect(
+            enemy.x + 7,
+            enemy.y + 8,
+            3,
+            3
+        );
+
+        ctx.fillRect(
+            enemy.x + 18,
+            enemy.y + 8,
+            3,
+            3
+        );
+    });
+}
+
+function gameLoop() {
+
+    if(!playing) return;
+
+    update();
+    draw();
+
+    requestAnimationFrame(gameLoop);
+}
+
+function gameOver() {
+
+    playing = false;
+
+    document.getElementById("finalScore").textContent =
+        "Score : " + score + " 🪙 — Niveau " + level;
+
+    document.getElementById("gameOver").style.display = "flex";
+}
+
+createCoin();
+draw();
+
+</script>
+
+</body>
+</html>
