@@ -1,0 +1,12 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PixelPlay</title><link rel="stylesheet" href="style.css"></head><body>
+<header><h1>🎮 PixelPlay</h1><nav><button onclick="filter('all')">Tous</button><button onclick="filter('arcade')">Arcade</button><button onclick="filter('action')">Action</button></nav></header>
+<section class="hero"><h2>Joue gratuitement 🎮</h2><p>Une petite plateforme de jeux créée par toi.</p></section>
+<div class="searchbox"><input class="search" id="search" placeholder="🔎 Rechercher un jeu..." oninput="render()"></div>
+<main class="grid" id="games"></main><footer>PixelPlay • Tes jeux, ton site 🚀</footer>
+<script>
+const games=[{name:'Super Pixel Quest',cat:'arcade',emoji:'⭐',url:'jeux/super-pixel-quest/',desc:'Plateforme rétro'}];
+let current='all';
+function filter(x){current=x;render()}
+function render(){let q=document.getElementById('search').value.toLowerCase();let list=games.filter(g=>(current==='all'||g.cat===current)&&g.name.toLowerCase().includes(q));document.getElementById('games').innerHTML=list.map(g=>`<article class="card"><div class="thumb">${g.emoji}</div><div><h3>${g.name}</h3><span class="tag">${g.cat} • ${g.desc}</span><br><a class="play" href="${g.url}">JOUER ▶</a></div></article>`).join('')||'<p>Aucun jeu trouvé.</p>'}
+render();
+</script></body></html>
