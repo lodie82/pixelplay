@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Super Pixel Quest</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#111;font-family:Arial,sans-serif}
+body{display:flex;align-items:center;justify-content:center}
+#wrap{position:relative;width:100vw;height:100vh;background:#72c9ff;overflow:hidden}
+canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
+#hud{position:absolute;top:14px;left:18px;color:white;font-weight:900;font-size:20px;text-shadow:3px 3px #000;z-index:2}
+#help{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);color:white;background:#0009;padding:8px 14px;border-radius:12px;font-size:14px;text-align:center;z-index:2}
+#start,#win{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#0008;z-index:5}
+.panel{background:#fff;border:6px solid #222;border-radius:22px;padding:28px;max-width:560px;text-align:center;box-shadow:0 12px 0 #111}
+h1{margin:0 0 10px;font-size:42px;color:#e33;text-shadow:3px 3px #ffd34e}
+p{font-size:18px;line-height:1.45}
+button{border:0;border-radius:14px;background:#e33;color:white;font-size:22px;font-weight:900;padding:14px 28px;cursor:pointer;box-shadow:0 6px 0 #921d1d}
+button:active{transform:translateY(5px);box-shadow:0 1px 0 #921d1d}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div id="wrap">
+<canvas id="game" width="1280" height="720"></canvas>
+<div id="hud">🪙 0 &nbsp; ❤️ 3 &nbsp; ⭐ 0</div>
+<div id="help">← → / A D : bouger &nbsp; • &nbsp; ESPACE / W / ↑ : sauter &nbsp; • &nbsp; R : recommencer</div>
+<div id="start"><div class="panel">
+<h1>SUPER PIXEL QUEST</h1>
+<p>Un petit platformer rétro inspiré des jeux de plateformes classiques.</p>
+<p><b>But :</b> ramasse les pièces, écrase les monstres et atteins le drapeau !</p>
+<button id="play">JOUER</button>
+</div></div>
+<div id="win" class="hidden"><div class="panel">
+<h1>NIVEAU TERMINÉ ! 🎉</h1>
+<p id="scoreText"></p>
+<button id="again">REJOUER</button>
+</div></div>
+</div>
+<script>
+const c=document.getElementById("game"),ctx=c.getContext("2d");
+const W=1280,H=720,worldW=6500;
+let keys={},cam=0,started=false,won=false;
+let score=0,lives=3,coins=0,stars=0;
+const player={x:120,y:480,w:38,h:52,vx:0,vy:0,on:false,inv:0};
+const platforms=[
+ [0,650,900,70],[1000,650,800,70],[1900,650,900,70],[2900,650,1000,70],
+ [4000,650,850,70],[4950,650,1550,70],
+ [500,545,180,28],[820,480,150,28],[1120,540,190,28],[1450,470,190,28],
+ [1750,560,140,28],[2050,520,180,28],[2350,450,180,28],[2650,540,170,28],
+ [3100,520,190,28],[3450,445,180,28],[3750,540,180,28],[4100,470,190,28],
+ [4450,540,180,28],[4700,430,170,28],[5150,520,180,28],[5500,450,190,28],
+ [5850,540,180,28]
+];
+let coinsArr=[
+ [540,500],[600,500],[875,435],[1170,490],[1225,490],[1500,420],[1560,420],
+ [1790,510],[2090,460],[2145,460],[2390,390],[2690,480],[3150,460],[3205,460],
+ [3500,385],[3560,385],[3800,500],[4160,410],[4215,410],[4510,490],[4750,370],
+ [5200,470],[5260,470],[5570,400],[5900,490],[5960,490]
+].map(a=>({x:a[0],y:a[1],got:false}));
+let enemies=[
+ {x:700,y:605,w:38,h:42,vx:-1.2,alive:true,min:650,max:850},
+ {x:1350,y:605,w:38,h:42,vx:1.2,alive:true,min:1150,max:1650},
+ {x:2180,y:605,w:38,h:42,vx:-1.3,alive:true,min:1950,max:2700},
+ {x:3250,y:605,w:38,h:42,vx:1.5,alive:true,min:2950,max:3900},
+ {x:4300,y:605,w:38,h:42,vx:-1.4,alive:true,min:4000,max:4800},
+ {x:5400,y:605,w:38,h:42,vx:1.5,alive:true,min:5000,max:6200}
+];
+const flag={x:6200,y:530,w:35,h:120};
+const starsArr=[{x:1640,y:390,got:false},{x:3850,y:390,got:false},{x:5650,y:395,got:false}];
+
+function reset(){
+ player.x=120;player.y=580;player.vx=player.vy=0;cam=0;score=coins=stars=0;lives=3;won=false;
+ coinsArr.forEach(x=>x.got=false);starsArr.forEach(x=>x.got=false);
+ enemies.forEach((e,i)=>{e.alive=true;e.x=[700,1350,2180,3250,4300,5400][i];e.vx=i%2?-1.2:1.2});
+ updateHud();
+}
+function updateHud(){document.getElementById("hud").innerHTML=`🪙 ${coins} &nbsp; ❤️ ${lives} &nbsp; ⭐ ${stars}`}
+
+addEventListener("keydown",e=>{keys[e.key.toLowerCase()]=true;if([" ","arrowup","arrowdown","arrowleft","arrowright"].includes(e.key.toLowerCase()))e.preventDefault();if(e.key.toLowerCase()==="r"&&started)reset()});
+addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
+document.getElementById("play").onclick=()=>{started=true;document.getElementById("start").classList.add("hidden");reset()};
+document.getElementById("again").onclick=()=>{document.getElementById("win").classList.add("hidden");reset();started=true};
+
+function rectHit(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y}
+function update(){
+ if(!started||won)return;
+ let left=keys["arrowleft"]||keys["a"],right=keys["arrowright"]||keys["d"],jump=keys[" "]||keys["w"]||keys["arrowup"];
+ if(left)player.vx-=0.7;if(right)player.vx+=0.7;
+ if(!left&&!right)player.vx*=0.82;
+ player.vx=Math.max(-7,Math.min(7,player.vx));
+ if(jump&&player.on){player.vy=-15;player.on=false}
+ player.vy+=0.7;player.vy=Math.min(18,player.vy);
+ player.x+=player.vx;player.y+=player.vy;
+ if(player.x<0)player.x=0;if(player.x>worldW-player.w)player.x=worldW-player.w;
+ player.on=false;
+ for(const p of platforms){
+   const r={x:p[0],y:p[1],w:p[2],h:p[3]};
+   if(player.vy>=0&&player.x+player.w>r.x&&player.x<r.x+r.w&&player.y+player.h>=r.y&&player.y+player.h-player.vy<=r.y){
+     player.y=r.y-player.h;player.vy=0;player.on=true;
+   }
+ }
+ if(player.inv>0)player.inv--;
+ for(const co of coinsArr)if(!co.got&&Math.abs(player.x+player.w/2-co.x)<30&&Math.abs(player.y+player.h/2-co.y)<35){co.got=true;coins++;score+=100;updateHud()}
+ for(const s of starsArr)if(!s.got&&Math.abs(player.x+player.w/2-s.x)<35&&Math.abs(player.y+player.h/2-s.y)<40){s.got=true;stars++;score+=500;updateHud()}
+ for(const e of enemies)if(e.alive){
+   e.x+=e.vx;if(e.x<e.min||e.x>e.max)e.vx*=-1;
+   const er={x:e.x,y:e.y,w:e.w,h:e.h};
+   if(rectHit(player,er)){
+     if(player.vy>2&&player.y+player.h<e.y+22){e.alive=false;player.vy=-9;score+=250}
+     else if(player.inv<=0){lives--;player.inv=100;player.x=Math.max(50,player.x-180);player.y=450;player.vy=-8;updateHud();if(lives<=0)reset()}
+   }
+ }
+ if(player.y>800){lives--;updateHud();player.x=Math.max(50,player.x-300);player.y=450;player.vy=-8;if(lives<=0)reset()}
+ if(rectHit(player,flag)){won=true;document.getElementById("scoreText").textContent=`Score : ${score} • Pièces : ${coins} • Étoiles : ${stars}`;document.getElementById("win").classList.remove("hidden")}
+ cam+=(player.x-400-cam)*0.12;cam=Math.max(0,Math.min(worldW-W,cam));
+}
+function draw(){
+ ctx.clearRect(0,0,W,H);
+ // sky
+ ctx.fillStyle="#72c9ff";ctx.fillRect(0,0,W,H);
+ // clouds
+ for(let i=-1;i<12;i++){let x=i*650-cam*0.25;ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(x+80,120,32,0,7);ctx.arc(x+120,110,45,0,7);ctx.arc(x+170,125,28,0,7);ctx.fill()}
+ // hills
+ for(let i=-1;i<10;i++){let x=i*800-cam*0.45;ctx.fillStyle="#54b85a";ctx.beginPath();ctx.arc(x+250,650,260,Math.PI,0);ctx.fill()}
+ // distant ground
+ ctx.fillStyle="#86d65c";ctx.fillRect(0,620,W,30);
+ ctx.save();ctx.translate(-cam,0);
+ // platforms
+ for(const p of platforms){
+   ctx.fillStyle="#9b5a2b";ctx.fillRect(p[0],p[1],p[2],p[3]);
+   ctx.fillStyle="#47a93c";ctx.fillRect(p[0],p[1],p[2],9);
+   for(let x=p[0]+8;x<p[0]+p[2]-5;x+=28){ctx.fillStyle="#7b421f";ctx.fillRect(x,p[1]+15,14,9)}
+ }
+ // coins
+ for(const co of coinsArr)if(!co.got){ctx.fillStyle="#ffd83d";ctx.beginPath();ctx.arc(co.x,co.y,12,0,7);ctx.fill();ctx.fillStyle="#fff08a";ctx.fillRect(co.x-3,co.y-8,4,16)}
+ // stars
+ for(const s of starsArr)if(!s.got){drawStar(s.x,s.y,18,"#ffe33b");}
+ // flag
+ ctx.fillStyle="#eee";ctx.fillRect(flag.x,flag.y,7,flag.h);
+ ctx.fillStyle="#ef3e4a";ctx.beginPath();ctx.moveTo(flag.x+7,flag.y);ctx.lineTo(flag.x+62,flag.y+25);ctx.lineTo(flag.x+7,flag.y+48);ctx.fill();
+ // enemies
+ for(const e of enemies)if(e.alive){
+   ctx.fillStyle="#8b4bd1";ctx.fillRect(e.x,e.y,e.w,e.h);
+   ctx.fillStyle="#fff";ctx.fillRect(e.x+7,e.y+8,8,10);ctx.fillRect(e.x+24,e.y+8,8,10);
+   ctx.fillStyle="#222";ctx.fillRect(e.x+10,e.y+11,4,6);ctx.fillRect(e.x+27,e.y+11,4,6);
+   ctx.fillStyle="#5b2a91";ctx.fillRect(e.x-4,e.y+37,18,6);ctx.fillRect(e.x+24,e.y+37,18,6);
+ }
+ // player
+ if(player.inv%8<4){
+   ctx.fillStyle="#e33";ctx.fillRect(player.x+6,player.y,28,14);
+   ctx.fillStyle="#ffd0a0";ctx.fillRect(player.x+9,player.y+12,23,18);
+   ctx.fillStyle="#1565c0";ctx.fillRect(player.x+6,player.y+29,28,19);
+   ctx.fillStyle="#e33";ctx.fillRect(player.x,player.y+45,17,7);ctx.fillRect(player.x+24,player.y+45,17,7);
+   ctx.fillStyle="#222";ctx.fillRect(player.x+26,player.y+17,4,5);
+ }
+ ctx.restore();
+}
+function drawStar(x,y,r,col){ctx.fillStyle=col;ctx.beginPath();for(let i=0;i<10;i++){let a=-Math.PI/2+i*Math.PI/5,rr=i%2?r:r*.42;ctx.lineTo(x+Math.cos(a)*rr,y+Math.sin(a)*rr)}ctx.closePath();ctx.fill()}
+function loop(){update();draw();requestAnimationFrame(loop)}
+loop();
+</script>
+</body>
+</html>
